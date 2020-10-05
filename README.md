@@ -8,7 +8,8 @@ Be sure to have the most updated versions of the following Python libraries:
 - requests
 
 To install on Mac Terminal:  
-	- "python3 -m pip install [package name]"
+	
+	"python3 -m pip install [package name]"
 
 ## Setting Up Credentials
 ### Spotify Credentials
@@ -27,10 +28,9 @@ Both should be retrieved for a NATIVE desktop application
 
 
 ## Getting a KeyError?
-Spotify tokens expire hourly, so if you're getting a KeyError, it should go away if you update the token in secrets.py
+Spotify tokens expire hourly, so if you're getting a KeyError, it should go away if you update the token in secrets.py.
 
-## Music Video Title Parsing
-# Why aren't we using the youtube_dl library?
+## Music Video Title Parsing - why aren't we using the youtube_dl library?
 The youtube_dl library is currently unable to retrieve the artist and song.  As an alternative,
 the program parses the title.  If the search words are too specific for Spotify, no songs will come up.  The code attempts 
 to combat this by omitting certain phrases typically used in titles of YouTube music videos.  This occurs in the "clean_title" function (which has much room for improvement - it cannot "clean" titles well enough for many videos). 
