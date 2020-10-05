@@ -2,11 +2,12 @@
 ![image of created Spotify playlist](working_proj.png)
 
 ## Installation Dependencies
-	- Be sure to have the most updated versions of the following Python libraries:
-		- google-auth-oauthlib
-		- google-api-python-client
-		- requests
-	- To install on Mac Terminal: "python3 -m pip install [package name]"
+Be sure to have the most updated versions of the following Python libraries:
+	- google-auth-oauthlib
+	- google-api-python-client
+	- requests
+To install on Mac Terminal: 
+	"python3 -m pip install [package name]"
 
 ## Setting Up Credentials
 ### Spotify Credentials
