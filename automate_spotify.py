@@ -1,20 +1,6 @@
-'''
-Step 1: log into youtube
-Step 2: Grab our Liked Videos (I'm hoping to make a separate playlist?  
-	or eh.  I should test this on a diff email)
-Step 3: Create a New Playlist
-Step 4: Search For the Song
-Step 5: Add this song into the new Spotify playlist
-
-APIs to use:
-- YouTube Data API
-- Spotify Web API
-- youtube Data Library
-
-'''
 import json
 import requests
-import youtube_dl
+import re
 
 import os
 import google_auth_oauthlib.flow
@@ -59,10 +45,6 @@ class CreatePlaylist:
 
 	# Step 2: Grab Liked Videos and create dictionary of song info
 	def get_liked_videos(self):
-		# due to YouTube update, we need a custom agent to extract the song and artist
-		youtube_dl.utils.std_headers['User-Agent'] = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
-		#youtube_dl.utils.std_headers["User-Agent"] = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-		# works for the first video "Keep pushing; artist has to be mentioned in description???"
 		request = self.youtube_client.videos().list(
 			part="snippet,contentDetails,statistics", #only get what we need
 			myRating="like",
@@ -75,29 +57,11 @@ class CreatePlaylist:
 			# dict maps song titles to dict of other info
 		for item in response["items"]:
 			video_title = item["snippet"]["title"]
-			youtube_url = "https://www.youtube.com/watch?v={}".format(item["id"])
+			#youtube_url = "https://www.youtube.com/watch?v={}".format(item["id"])
 
-			# use youtube_dl to get the song name and artist
-				# rn this isn't working... maybe I can write a function that takes the title, deletes
-				# anything that says MV, M/V, or Official Music Video, deletes any non-English characters
-					# maybe get rid of [], (), / too?
-			video = youtube_dl.YoutubeDL({}).extract_info(youtube_url, download=False)
-			song_name = video["track"]
-			artist = video["artist"]
-			print("title", video_title)
-			print("song:", song_name)
-			print("artist:", artist)
-
-
-			if song_name != None and artist != None:
-				# store important info on valid songs to dictionary
-				self.song_info_dict[video_title] = {
-					"youtube_url": youtube_url,
-					"song_name": song_name,
-					"artist": artist,
-					"spotify_uri": self.get_spotify_uri(song_name, artist)
+			self.song_info_dict[video_title] = {
+					"spotify_uri": self.get_spotify_uri(video_title)
 				}
-				print(youtube_url)
 
 
 	# Step 3: Create a New Playlist on Spotify
@@ -125,18 +89,30 @@ class CreatePlaylist:
 		# playlist id
 		return response_json["id"]
 
+	# Step 3.5: 
+	def clean_title(self, video_title):
+		# delete irrelevant phrases for Spotify search
+		take_out = ["official music video", "mv", "m/v", "official video", "music video", "ft", "feat", 
+				"official audio", "lyrics", "eng", "lyric video"]
+		title = video_title.lower()
+		for word in take_out:
+			title = title.replace(word, "")
+		# get only alphanumeric characters and insert the %20 formatting for searching
+		regex = re.compile('[^a-z0-9 ]')
+		title = regex.sub('', title)
+		title = "%20".join(title.split())
+		print("title", title)
+		return title
 
 	# Step 4: Search For the Song
-	def get_spotify_uri(self, song_name, artist):
+	def get_spotify_uri(self, video_title):
 		'''
 		Search for the song 
 		'''
+
+		video_title = self.clean_title(video_title)
 		# alternative query link:
-		# "https://api.spotify.com/v1/search?q={}&type=track%2Cartist&limit=10&offset=0".format("%20".song_name.split().join())
-		query = "https://api.spotify.com/v1/search?query=track%3A{}+artist%3A{}&type=track&offset=0&limit=20".format(
-			song_name,
-			artist
-		)
+		query = "https://api.spotify.com/v1/search?q={}&type=track%2Cartist&limit=10&offset=0".format(video_title)
 
 		response = requests.get(
 			query,
@@ -148,8 +124,12 @@ class CreatePlaylist:
 		response_json = response.json()
 		songs = response_json["tracks"]["items"]
 
+		if len(songs) == 0:
+			# nothing came up in the Spotify search
+			return None
 		# only use the first song
 		uri = songs[0]["uri"]
+		print("uri found:", uri)
 		return uri
 
 	# Step 5: Add songs into the new Spotify playlist
@@ -157,15 +137,15 @@ class CreatePlaylist:
 		# get liked songs
 		self.get_liked_videos()
 		# make a uris list
-		uris = [info["spotify_uri"] for song, info in self.song_info_dict.items()]
+		uris = [info["spotify_uri"] for song, info in self.song_info_dict.items() 
+				if info["spotify_uri"] != None]
 
 		# make a new spotify playlist
 		playlist_id = self.create_playlist()
 
 		query = "https://api.spotify.com/v1/playlists/{}/tracks".format(playlist_id)
 		request_data = json.dumps(uris)
-		print("uris:", request_data)
-		print("uri length", len(uris))
+		print(len(uris), "songs found")
 		response = requests.post(
 			query,
 			data=request_data, 
@@ -176,9 +156,10 @@ class CreatePlaylist:
 		)
 
 		# Raise exception for invalid status code
-		if response.status_code != 200:
+		if response.status_code >= 400:
 			raise ResponseException(response.status_code)
 
+		print("Successfully completed.")
 		return response.json()
 
 
